@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+# Usage
+#   bin/compile BUILD_DIR CACHE_DIR ENV_DIR
+#
+# Arguments
+#   BUILD_DIR - directory where the app source code exists
+#   CACHE_DIR - directory where cached results can be reused between builds
+#   ENV_DIR   - directory that contains a file for each configuration variable
+#
+# Description
+#   This script performs the buildpack transformation.
+#   The contents of CACHE_DIR will be persisted between builds.
+#   You can cache the results of long processes here to speed up future builds.
+#   You should create the CACHE_DIR directory if it doesn't exist.
+#   The application in BUILD_DIR along with all changes made by the compile
+#   script will be packaged into a slug.
+#   All output received on stdout from this script will be displayed to the user.
+#
+# https://devcenter.heroku.com/articles/buildpack-api#bin-compile
+
+### Configure environment
+
+set -o errexit  # always exit on error
+set -o pipefail # don't ignore exit codes when piping output
+unset GIT_DIR   # Avoid GIT_DIR leak from previous build steps
+
+### Configure constants
+
+GITHUB_OWNER="uilicious"
+GITHUB_REPO="uilicious-cli"
+
+### Configure directories
+
+BUILD_DIR=${1:-}
+CACHE_DIR=${2:-}
+ENV_DIR=${3:-}
+BUILDPACK_DIR="$(dirname $(dirname "$0"))"
+
+### Load dependencies
+
+source $BUILDPACK_DIR/lib/output.sh
+source $BUILDPACK_DIR/lib/environment.sh
+source $BUILDPACK_DIR/lib/github.sh
+
+### Export UIlicious variables
+
+puts_header "Creating runtime environment"
+
+export_env_dir "${ENV_DIR}" "^(UILICIOUS_)"
+
+export UILICIOUS_CLI_VERSION=${UILICIOUS_CLI_VERSION:-$(get_latest_release $GITHUB_OWNER $GITHUB_REPO)}
+export UILICIOUS_CLI_OS=${UILICIOUS_CLI_OS:-$(get_os)}
+export UILICIOUS_CLI_ARCH=${UILICIOUS_CLI_ARCH:-$(get_arch)}
+
+print_env "^UILICIOUS_"
+
+### Download UIlicious CLI
+
+puts_header "Downloading UIlicious CLI"
+
+INSTALL_UILICIOUS_DIR="${BUILD_DIR}/.uilicious/bin"
+INSTALL_UILICIOUS_FILE="${INSTALL_UILICIOUS_DIR}/uilicious-cli"
+UILICIOUS_CLI_DOWNLOAD_URL="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/${UILICIOUS_CLI_VERSION}/uilicious-cli-${UILICIOUS_CLI_OS}-${UILICIOUS_CLI_ARCH}"
+
+puts_info "${UILICIOUS_CLI_DOWNLOAD_URL}"
+
+rm -rf "${INSTALL_UILICIOUS_DIR}"
+mkdir -p "${INSTALL_UILICIOUS_DIR}"
+
+curl \
+  --silent \
+  --show-error \
+  --fail \
+  --retry 3 \
+  --retry-max-time 15 \
+  --location \
+  -o "${INSTALL_UILICIOUS_FILE}" \
+  "${UILICIOUS_CLI_DOWNLOAD_URL}" \
+  2>&1 | indent
+
+chmod +x "${INSTALL_UILICIOUS_FILE}"
+
+### Installing UIlicious CLI
+
+puts_header "Installing UIlicious CLI"
+
+# Make the cli available when dynos start
+# https://devcenter.heroku.com/articles/buildpack-api#profile-d-scripts
+mkdir -p "${BUILD_DIR}/.profile.d"
+cat > "${BUILD_DIR}/.profile.d/uilicious-cli.sh" << EOF
+export PATH="\$PATH:\$HOME/.uilicious/bin"
+EOF
+chmod +x "$BUILD_DIR/.profile.d/uilicious-cli.sh"
+
+# Make the cli available to downstream buildpacks
+# https://devcenter.heroku.com/articles/buildpack-api#composing-multiple-buildpacks
+cat > "${BUILDPACK_DIR}/export" << EOF
+export PATH="\$PATH:\$HOME/.uilicious/bin"
+EOF
+
+### Done
+
+"${INSTALL_UILICIOUS_FILE}" --help | indent
+
+puts_header "Successfully installed UIlicious CLI $(${INSTALL_UILICIOUS_FILE} --version)"

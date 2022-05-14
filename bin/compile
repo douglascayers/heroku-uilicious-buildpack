@@ -91,16 +91,20 @@ mkdir -p "${BUILD_DIR}/.profile.d"
 cat > "${BUILD_DIR}/.profile.d/uilicious-cli.sh" << EOF
 export PATH="\$PATH:\$HOME/.uilicious/bin"
 EOF
-chmod +x "$BUILD_DIR/.profile.d/uilicious-cli.sh"
+chmod +x "${BUILD_DIR}/.profile.d/uilicious-cli.sh"
 
 # Make the cli available to downstream buildpacks
 # https://devcenter.heroku.com/articles/buildpack-api#composing-multiple-buildpacks
 cat > "${BUILDPACK_DIR}/export" << EOF
 export PATH="\$PATH:\$HOME/.uilicious/bin"
 EOF
+chmod +x "${BUILDPACK_DIR}/export"
+
+# Make the cli available now to rest of the script
+PATH="$PATH:${INSTALL_UILICIOUS_DIR}"
 
 ### Done
 
-"${INSTALL_UILICIOUS_FILE}" --help | indent
+uilicious-cli --help | indent
 
-puts_header "Successfully installed UIlicious CLI $(${INSTALL_UILICIOUS_FILE} --version)"
+puts_header "Successfully installed UIlicious CLI $(uilicious-cli --version)"

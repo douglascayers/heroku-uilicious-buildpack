@@ -1,0 +1,20 @@
+# GUS-Aware Compliance: identify the GUS Team name and Product Tag name for your repo. 
+# Uses human-readable names, not the IDs. 
+# https://confluence.internal.salesforce.com/display/public/corescm/Create+a+GUS-Aware+CODEOWNERS+File
+
+#GUSINFO:Trailhead Assessments & Content Operations,TCE Badge Automation Testing
+*
+
+# A CODEOWNERS file uses a pattern that follows the same rules used in gitignore files.
+# The pattern is followed by one or more GitHub usernames or team names using the standard
+# @username or @org/team-name format. You can also refer to a user by an email address
+# that has been added to their GitHub account, for example user@example.com.
+#
+# https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
+
+# Default owners for everything in the repo.
+# * @trailhead-content-bot
+
+# Order is important. The last matching pattern has the most precedence.
+# Down the line we could have defaults based on language, example:
+# *.js
